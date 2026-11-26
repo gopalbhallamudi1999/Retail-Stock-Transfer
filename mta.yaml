@@ -1,0 +1,86 @@
+_schema-version: 3.3.0
+ID: retail-stock-transfer-cap
+version: 1.0.0
+description: "Retail stock transfers with approval, dispatch, and receipt"
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - tar -xzf project-files.tar.gz --skip-old-files
+        - npm ci
+        - sh scripts/build-cf.sh
+modules:
+  - name: retail-stock-transfer-cap-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: retail-stock-transfer-cap-auth
+      - name: retail-stock-transfer-cap-db
+
+  - name: retail-stock-transfer-cap-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: retail-stock-transfer-cap-db
+  - name: retail-stock-transfer-cap
+    type: approuter.nodejs
+    path: .deploy/app-router
+    parameters:
+      keep-existing-routes: true
+      disk-quota: 256M
+      memory: 256M
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api # must be used in xs-app.json as well
+          url: ~{srv-url}
+          forwardAuthToken: true
+      - name: retail-stock-transfer-cap-auth
+    provides:
+      - name: app-api
+        properties:
+          app-protocol: ${protocol}
+          app-uri: ${default-uri}
+
+resources:
+  - name: retail-stock-transfer-cap-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: retail-stock-transfer-cap-${org}-${space}
+        tenant-mode: dedicated
+        oauth2-configuration:
+          credential-types:
+            - "binding-secret"
+            - "x509"
+          redirect-uris:
+            - https://*~{app-api/app-uri}/**
+        role-collections:
+          - name: 'InventoryController (retail-stock-transfer-cap ${org}-${space})'
+            description: 'generated'
+            role-template-references:
+              - '$XSAPPNAME.InventoryController'
+    requires:
+      - name: app-api
+  - name: retail-stock-transfer-cap-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared

@@ -1,0 +1,39 @@
+{
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.StoreManager",
+      "description": "StoreManager"
+    },
+    {
+      "name": "$XSAPPNAME.InventoryController",
+      "description": "InventoryController"
+    }
+  ],
+  "attributes": [
+    {
+      "name": "StoreID",
+      "description": "Authorized store UUIDs",
+      "valueType": "string"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "StoreManager",
+      "description": "generated",
+      "scope-references": [
+        "$XSAPPNAME.StoreManager"
+      ],
+      "attribute-references": [
+        "StoreID"
+      ]
+    },
+    {
+      "name": "InventoryController",
+      "description": "generated",
+      "scope-references": [
+        "$XSAPPNAME.InventoryController"
+      ],
+      "attribute-references": []
+    }
+  ]
+}
